@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Train Scheduler</title>
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <style>
+    #container{
+        width:960px;
+        margin: 0 auto;
+    }
+
+    #header{
+        height:220px;
+        background-color:rgb(116, 116, 116);
+        border-radius: 0 0 5px 5px;
+    }
+
+    h1,h3{
+        color:white;
+        text-align: center;
+    }
+    h1{
+        padding-top:60px;
+    }
+    .card{
+    margin-top:30px;
+    border:1px solid rgba(16, 40, 121, 0.781);
+    border-radius: 10px;    
+}
+
+    legend{
+       background-color:  rgba(16, 40, 121, 0.781);
+       color:white;
+       padding:5px 0 5px 15px;
+       font-size:1.2em;
+       border-radius: 9px 9px 0 0;
+    }
+
+    form,.table{
+        padding:12px;
+    }
+    .card{
+        margin-bottom:20px;
+    }
+    .btn{
+        background-color:  rgba(16, 40, 121, 0.781);
+    }
+    
+    
+  
+  </style>
+</head>
+
+<body>
+<div id = "container">
+    <div id = "header">
+       <h1>Anytime is Train Time</h1>
+       <h3>Choo Choo. Chee Chee</h3>
+    </div>
+    <div class = "card">
+            <legend>Current Train Schedule</legend>
+            <table class="table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Train Name</th>
+                        <th scope="col">Destination</th>
+                        <th scope="col">Frequency (min)</th>
+                        <th scope="col">Next Arrival</th>
+                        <th scope="col">Minutes Away</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody">
+                      
+                    </tbody>
+                  </table>
+        </div>   
+    <div class = "card">
+            <legend>Add Train</legend>
+            <form>
+                <div class="form-group">
+                    <label for="trainName">Train Name</label>
+                    <input type="text" class="form-control" id="trainName">    
+                </div>
+                <div class="form-group">
+                        <label for="destination">Destination</label>
+                        <input type="text" class="form-control" id="destination">    
+                    </div>
+                <div class="form-group">
+                        <label for="firstTrain">First Train Time (HH:mm - military time)</label>
+                        <input type="text" class="form-control" id="firstTrain">    
+                    </div>
+                <div class="form-group">
+                        <label for="frequency">Frequency (min)</label>
+                        <input type="text" class="form-control" id="frequency">    
+                    </div>
+                
+                <button type="submit" id = "submitBtn" class="btn btn-primary">Submit</button>
+                </form>
+            
+        </div>   
+
+</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/momentjs/2.12.0/moment.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/5.9.3/firebase.js"></script>
+  <script type="text/javascript">
+
+// Initialize Firebase
+var config = {
+    apiKey: "AIzaSyBJZD3kn5TrRlAOkD5WO8eExjoDhPXSJto",
+    authDomain: "train-time-c20cd.firebaseapp.com",
+    databaseURL: "https://train-time-c20cd.firebaseio.com",
+    projectId: "train-time-c20cd",
+    storageBucket: "train-time-c20cd.appspot.com",
+    messagingSenderId: "1068840417906"
+  };
+  firebase.initializeApp(config);
+  var dataRef = firebase.database();
+  var allRows = [];
+  function displayRows(){
+      $("#tbody").empty();
+      for(var i = 0; i < allRows.length; i++){
+          var row = $("<tr>");
+
+//put the information into table
+        row.append($("<td>").text(allRows[i].trainName));
+        row.append($("<td>").text(allRows[i].destination));
+        row.append($("<td>").text(allRows[i].frequency));
+        row.append($("<td>").text(allRows[i].nextTrainTime.format("hh:mm A")));
+        row.append($("<td>").text(allRows[i].nextTrainMinutes));
+
+        $("#tbody").append(row);
+      }
+  }
+
+  $("#submitBtn").on("click",function(event){
+      event.preventDefault();
+      dataRef.ref().push({
+            trainName: $("#trainName").val().trim(),
+            destination: $("#destination").val().trim(),
+            firstTrain: $("#firstTrain").val().trim(),
+            frequency: $("#frequency").val().trim(),
+            dateAdded: firebase.database.ServerValue.TIMESTAMP
+      });
+
+//empty input
+            $("#trainName").val("");
+            $("#destination").val("");
+            $("#firstTrain").val("");
+            $("#frequency").val("");
+  })
+
+// Firebase watcher + initial loader HINT: .on("value")
+dataRef.ref().on("child_added", function(snapshot) {
+            // Log everything that's coming out of snapshot
+            console.log(snapshot.val().trainName);
+            console.log(snapshot.val().destination);
+            console.log(snapshot.val().firstTrain);
+            console.log(snapshot.val().frequency);
+
+    // Change the HTML to reflect
+    var value = snapshot.val();
+    var firstTime= moment(value.firstTrain, "HH:mm").subtract(1,"days");
+
+    // Difference between the times
+    var diffTime = moment().diff(moment(firstTime), "minutes");
+    var tFrequency = value.frequency;
+
+    // Time apart (remainder)
+    var tRemainder = diffTime % tFrequency;
+
+    // Minute Until Train
+    var tMinutesTillTrain = tFrequency - tRemainder;
+    // Next Train
+    var nextTrain = moment().add(tMinutesTillTrain, "minutes");
+
+    allRows.push({
+        trainName: value.trainName,
+        destination: value.destination,
+        frequency: value.frequency,
+        nextTrainTime: nextTrain,
+        nextTrainMinutes:  tMinutesTillTrain,
+    });
+
+    displayRows();
+
+    // Handle the errors
+    }, function(errorObject) {
+    console.log("Errors handled: " + errorObject.code);
+    });
+
+    setInterval(updateTime,60000);
+    function updateTime(){
+    for(var i = 0; i < allRows.length; i++){
+        var row = allRows[i];
+        row.nextTrainMinutes--;
+        if(row.nextTrainMinutes === 0){
+            row.nextTrainMinutes = row.frequency;
+            row.nextTrainTime = row.nextTrainTime.add(row.frequency, "minutes");
+        }
+    }
+
+    displayRows();
+    }
+
+
+
+    
+  </script>
+</body>
+
+</html>
